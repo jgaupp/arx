@@ -1142,23 +1142,23 @@ public abstract class Metric<T extends InformationLoss<?>> implements Serializab
     }
 
     /** Is the metric independent?. */
-    private boolean           independent      = false;
-    
+    private boolean      independent                 = false;
+
     /** Is the metric monotonic with generalization?. */
-    private boolean           monotonicWithGeneralization    = true;
+    private Boolean      monotonicWithGeneralization = true;
 
     /** Is the metric monotonic with suppression?. */
-    private boolean           monotonic        = false;
+    private boolean      monotonic                   = false;
 
     /** Configuration factor. */
-    private final Double      gFactor;
-    
-    /** Configuration factor. */
-    private final Double      gsFactor;
+    private final Double gFactor;
 
     /** Configuration factor. */
-    private final Double      sFactor;
-    
+    private final Double gsFactor;
+
+    /** Configuration factor. */
+    private final Double sFactor;
+
     /**
      * Create a new metric.
      *
@@ -1377,7 +1377,27 @@ public abstract class Metric<T extends InformationLoss<?>> implements Serializab
      * @return
      */
     public final boolean isMonotonicWithGeneralization(){
-         return monotonicWithGeneralization;
+        if (monotonicWithGeneralization == null) {
+            monotonicWithGeneralization = true;
+        }
+        return monotonicWithGeneralization;
+    }
+
+    /**
+     * Returns whether this model is monotonic under the given suppression limit.
+     * Note: The suppression limit may be relative or absolute.
+     *
+     * @param suppressionLimit
+     * @return
+     */
+    public final boolean isMonotonic(double suppressionLimit) {
+        
+        // The suppression limit may be relative or absolute, so we check against 0 to cover both call conventions.
+        if (suppressionLimit == 0d) {
+            return this.isMonotonicWithGeneralization();
+        } else {
+            return this.isMonotonicWithSuppression();
+        } 
     }
     
     /**

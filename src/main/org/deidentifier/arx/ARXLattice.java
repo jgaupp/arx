@@ -76,8 +76,8 @@ public class ARXLattice implements Serializable {
         }
 
         /**
+         * Accessor method
          * 
-         *
          * @return
          */
         public Map<String, Integer> getAttributeMap() {
@@ -85,7 +85,7 @@ public class ARXLattice implements Serializable {
         }
 
         /**
-         * 
+         * Accessor method
          *
          * @param bottom
          */
@@ -94,7 +94,7 @@ public class ARXLattice implements Serializable {
         }
 
         /**
-         * 
+         * Accessor method
          *
          * @param levels
          */
@@ -103,7 +103,7 @@ public class ARXLattice implements Serializable {
         }
 
         /**
-         * 
+         * Accessor method
          *
          * @param metric
          */
@@ -112,7 +112,7 @@ public class ARXLattice implements Serializable {
         }
 
         /**
-         * 
+         * Accessor method
          *
          * @param config
          */
@@ -121,7 +121,7 @@ public class ARXLattice implements Serializable {
         }
 
         /**
-         * 
+         * Accessor method
          *
          * @param node
          */
@@ -130,7 +130,7 @@ public class ARXLattice implements Serializable {
         }
 
         /**
-         * 
+         * Accessor method
          *
          * @param size
          */
@@ -147,7 +147,7 @@ public class ARXLattice implements Serializable {
         }
         
         /**
-         * 
+         * Accessor method
          *
          * @param top
          */
@@ -156,7 +156,7 @@ public class ARXLattice implements Serializable {
         }
 
         /**
-         * 
+         * Accessor method
          *
          * @param uncertainty
          */
@@ -166,7 +166,7 @@ public class ARXLattice implements Serializable {
     }
 
     /**
-     * 
+     * ReflectS different anonymity properties 
      */
     public static enum Anonymity {
         
@@ -206,7 +206,7 @@ public class ARXLattice implements Serializable {
             private final ARXNode node;
 
             /**
-             * 
+             * Accessor class
              *
              * @param node
              */
@@ -1118,8 +1118,9 @@ public class ARXLattice implements Serializable {
         }
         return 0;
     }
+    
     /**
-     * Creates all relationships from the 
+     * Creates all relationships 
      * @param solutions
      * @param map
      * @param id
@@ -1194,7 +1195,7 @@ public class ARXLattice implements Serializable {
 
 
     /**
-     * Creates all relationships from the 
+     * Creates all relationships
      * @param solutions
      * @param map
      * @param id
@@ -1263,11 +1264,18 @@ public class ARXLattice implements Serializable {
         }
     }
     
-    private void setMonotonicity(boolean isSuppressionAlwaysEnabled, int absoluteMaxOutliers) {
+    /**
+     * Sets the monotonicity based on the current configuration
+     * @param isSuppressionAlwaysEnabled
+     * @param absoluteSuppressionLimit
+     */
+    private void setMonotonicity(boolean isSuppressionAlwaysEnabled, int absoluteSuppressionLimit) {
+        
+
         this.monotonicNonAnonymous = (this.metric.isMonotonicWithSuppression() && isSuppressionAlwaysEnabled) ||
                                      (this.metric.isMonotonicWithGeneralization() && !isSuppressionAlwaysEnabled);
-        this.monotonicAnonymous = (this.metric.isMonotonicWithSuppression() && absoluteMaxOutliers != 0) || 
-                                  (this.metric.isMonotonicWithGeneralization() && absoluteMaxOutliers == 0);
+        
+        this.monotonicAnonymous = this.metric.isMonotonic(absoluteSuppressionLimit);
     }
     
     /**
