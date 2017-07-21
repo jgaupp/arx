@@ -1,6 +1,6 @@
 /*
  * ARX: Powerful Data Anonymization
- * Copyright 2012 - 2016 Fabian Prasser, Florian Kohlmayer and contributors
+ * Copyright 2012 - 2017 Fabian Prasser, Florian Kohlmayer and contributors
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import org.deidentifier.arx.ARXConfiguration;
 import org.deidentifier.arx.DataDefinition;
 import org.deidentifier.arx.DataSubset;
 import org.deidentifier.arx.RowSet;
+import org.deidentifier.arx.certificate.elements.ElementData;
 import org.deidentifier.arx.criteria.PrivacyCriterion;
 import org.deidentifier.arx.framework.check.groupify.HashGroupify;
 import org.deidentifier.arx.framework.check.groupify.HashGroupifyEntry;
@@ -33,7 +34,6 @@ import org.deidentifier.arx.framework.data.Data;
 import org.deidentifier.arx.framework.data.DataManager;
 import org.deidentifier.arx.framework.data.GeneralizationHierarchy;
 import org.deidentifier.arx.framework.lattice.Transformation;
-import org.deidentifier.arx.metric.MetricConfiguration.MetricConfigurationAttackerModel;
 import org.deidentifier.arx.metric.v2.AbstractILMultiDimensional;
 import org.deidentifier.arx.metric.v2.AbstractMetricMultiDimensional;
 import org.deidentifier.arx.metric.v2.ILSingleDimensional;
@@ -757,8 +757,8 @@ public abstract class Metric<T extends InformationLoss<?>> implements Serializab
     }
 
     /**
-     * Creates an instance of the  metric for maximizing publisher benefit in the Stackelberg game
-     * which treats generalization and suppression equally.
+     * Creates an instance of the model for maximizing publisher benefit in the game-theoretic privacy
+     * model based on a cost/benefit analysis. The model treats generalization and suppression equally.
      * 
      * @param journalistAttackerModel If set to true, the journalist attacker model will be assumed, 
      *                                the prosecutor model will be assumed, otherwise
@@ -769,7 +769,8 @@ public abstract class Metric<T extends InformationLoss<?>> implements Serializab
     }
 
     /**
-     * Creates an instance of the  metric for maximizing publisher benefit in the Stackelberg game.
+     * Creates an instance of the model for maximizing publisher benefit in the game-theoretic privacy
+     * model based on a cost/benefit analysis.
      * 
      * @param journalistAttackerModel If set to true, the journalist attacker model will be assumed, 
      *                                the prosecutor model will be assumed, otherwise
@@ -1043,26 +1044,48 @@ public abstract class Metric<T extends InformationLoss<?>> implements Serializab
                                          return (metric instanceof MetricSDNMKLDivergence);
                                      } 
                },
-               new MetricDescription("Publisher payout",
+               new MetricDescription("Publisher payout (prosecutor)",
                                      false,  // monotonic variant supported
                                      false,  // attribute weights supported
                                      true,   // configurable coding model supported
                                      false,  // pre-computation supported
                                      false,  // aggregate function supported
-                                     true){  // attacker model supported
+                                     false){  // attacker model supported
 
                                      /** SVUID */
                                      private static final long serialVersionUID = 5297850895808449665L;
 
                                      @Override
                                      public Metric<?> createInstance(MetricConfiguration config) {
-                                         boolean journalist = config.getAttackerModel() == MetricConfigurationAttackerModel.JOURNALIST;
-                                         return createPublisherPayoutMetric(journalist, config.getGsFactor());
+                                         return createPublisherPayoutMetric(false, config.getGsFactor());
                                      } 
 
                                      @Override
                                      public boolean isInstance(Metric<?> metric) {
-                                         return (metric instanceof MetricSDNMPublisherPayout);
+                                         return (metric instanceof MetricSDNMPublisherPayout) &&
+                                                ((MetricSDNMPublisherPayout)metric).isProsecutorAttackerModel();
+                                     } 
+               },
+               new MetricDescription("Publisher payout (journalist)",
+                                     false,  // monotonic variant supported
+                                     false,  // attribute weights supported
+                                     true,   // configurable coding model supported
+                                     false,  // pre-computation supported
+                                     false,  // aggregate function supported
+                                     false){  // attacker model supported
+
+                                     /** SVUID */
+                                     private static final long serialVersionUID = -6985377052003037099L;
+
+                                    @Override
+                                     public Metric<?> createInstance(MetricConfiguration config) {
+                                         return createPublisherPayoutMetric(true, config.getGsFactor());
+                                     } 
+
+                                     @Override
+                                     public boolean isInstance(Metric<?> metric) {
+                                         return (metric instanceof MetricSDNMPublisherPayout) &&
+                                                ((MetricSDNMPublisherPayout)metric).isJournalistAttackerModel();
                                      } 
                },
                new MetricDescription("Entropy-based information loss",
@@ -1188,10 +1211,27 @@ public abstract class Metric<T extends InformationLoss<?>> implements Serializab
     }
 
     /**
+     * Returns an instance of the highest possible score. Lower is better.
+     * @return
+     */
+    public InformationLoss<?> createInstanceOfHighestScore() {
+        return createMaxInformationLoss();
+    }
+
+    /**
+     * Returns an instance of the lowest possible score. Lower is better.
+     * @return
+     */
+    public InformationLoss<?> createInstanceOfLowestScore() {
+        return createMinInformationLoss();
+    }
+    
+    /**
      * Returns an instance of the maximal value.
      *
      * @return
      */
+    @Deprecated
     public abstract InformationLoss<?> createMaxInformationLoss();
     
     /**
@@ -1199,6 +1239,7 @@ public abstract class Metric<T extends InformationLoss<?>> implements Serializab
      *
      * @return
      */
+    @Deprecated
     public abstract InformationLoss<?> createMinInformationLoss();
     
     /**
@@ -1372,18 +1413,6 @@ public abstract class Metric<T extends InformationLoss<?>> implements Serializab
     
     
     /**
-     * Returns false if the metric is non-monotonic when using generalization.
-     * 
-     * @return
-     */
-    public final boolean isMonotonicWithGeneralization(){
-        if (monotonicWithGeneralization == null) {
-            monotonicWithGeneralization = true;
-        }
-        return monotonicWithGeneralization;
-    }
-
-    /**
      * Returns whether this model is monotonic under the given suppression limit.
      * Note: The suppression limit may be relative or absolute.
      *
@@ -1398,6 +1427,18 @@ public abstract class Metric<T extends InformationLoss<?>> implements Serializab
         } else {
             return this.isMonotonicWithSuppression();
         } 
+    }
+
+    /**
+     * Returns false if the metric is non-monotonic when using generalization.
+     * 
+     * @return
+     */
+    public final boolean isMonotonicWithGeneralization(){
+        if (monotonicWithGeneralization == null) {
+            monotonicWithGeneralization = true;
+        }
+        return monotonicWithGeneralization;
     }
     
     /**
@@ -1436,6 +1477,12 @@ public abstract class Metric<T extends InformationLoss<?>> implements Serializab
     }
     
     /**
+     * Renders the privacy model
+     * @return
+     */
+    public abstract ElementData render(ARXConfiguration config);
+    
+    /**
      * Returns the name of metric.
      *
      * @return
@@ -1443,7 +1490,7 @@ public abstract class Metric<T extends InformationLoss<?>> implements Serializab
     public String toString() {
         return this.getClass().getSimpleName();
     }
-    
+
     /**
      * Evaluates the metric for the given node.
      *
@@ -1452,7 +1499,8 @@ public abstract class Metric<T extends InformationLoss<?>> implements Serializab
      * @return the double
      */
     protected abstract InformationLossWithBound<T> getInformationLossInternal(final Transformation node, final HashGroupify groupify);
-
+    
+ 
     /**
      * Returns the information loss that would be induced by suppressing the given entry. The loss
      * is not necessarily consistent with the loss that is computed by 
@@ -1463,8 +1511,7 @@ public abstract class Metric<T extends InformationLoss<?>> implements Serializab
      * @return
      */
     protected abstract InformationLossWithBound<T> getInformationLossInternal(final Transformation node, HashGroupifyEntry entry);
-    
- 
+
     /**
      * Returns a lower bound for the information loss for the given node. 
      * This can be used to expose the results of monotonic shares of a metric,
@@ -1492,7 +1539,7 @@ public abstract class Metric<T extends InformationLoss<?>> implements Serializab
      * @return
      */
     protected abstract T getLowerBoundInternal(final Transformation node, final HashGroupify groupify);
-
+    
     /**
      * Returns the number of records
      * @param config
@@ -1514,7 +1561,7 @@ public abstract class Metric<T extends InformationLoss<?>> implements Serializab
      * @return
      */
     protected RowSet getSubset(ARXConfiguration config) {
-        for (PrivacyCriterion c : config.getCriteria()) {
+        for (PrivacyCriterion c : config.getPrivacyModels()) {
             if (c.isSubsetAvailable()) {
                 DataSubset subset = c.getDataSubset();
                 if (subset != null) {

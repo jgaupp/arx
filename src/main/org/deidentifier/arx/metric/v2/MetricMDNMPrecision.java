@@ -1,6 +1,6 @@
 /*
  * ARX: Powerful Data Anonymization
- * Copyright 2012 - 2016 Fabian Prasser, Florian Kohlmayer and contributors
+ * Copyright 2012 - 2017 Fabian Prasser, Florian Kohlmayer and contributors
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import java.util.Arrays;
 
 import org.deidentifier.arx.ARXConfiguration;
 import org.deidentifier.arx.DataDefinition;
+import org.deidentifier.arx.certificate.elements.ElementData;
 import org.deidentifier.arx.framework.check.distribution.DistributionAggregateFunction;
 import org.deidentifier.arx.framework.check.groupify.HashGroupify;
 import org.deidentifier.arx.framework.check.groupify.HashGroupifyEntry;
@@ -136,6 +137,16 @@ public class MetricMDNMPrecision extends AbstractMetricMultiDimensional {
     }
 
     @Override
+    public ElementData render(ARXConfiguration config) {
+        ElementData result = new ElementData("Precision");
+        result.addProperty("Aggregate function", super.getAggregateFunction().toString());
+        result.addProperty("Monotonic", this.isMonotonic(config.getMaxOutliers()));
+        result.addProperty("Generalization factor", this.getGeneralizationFactor());
+        result.addProperty("Suppression factor", this.getSuppressionFactor());
+        return result;
+    }
+
+    @Override
     public String toString() {
         return "Non-monotonic precision";
     }
@@ -167,9 +178,10 @@ public class MetricMDNMPrecision extends AbstractMetricMultiDimensional {
             unsuppressedTuples += m.isNotOutlier ? m.count : 0;
             suppressedTuples += m.isNotOutlier ? 0 : m.count;
 
-            // Calculate avg. MSE
+            // Calculate avg. error
             for (int i = 0; i < dimensionsAggregated; i++) {
-                double share = (double) m.count * microaggregationFunctions[i].getMeanError(m.distributions[microaggregationStart + i]);
+                double share = (double) m.count * super.getError(microaggregationFunctions[i],
+                                                                 m.distributions[microaggregationStart + i]);  
                 result[dimensionsGeneralized + i] += m.isNotOutlier ? share * gFactor : 
                                                                       (sFactor == 1d ? m.count : share + sFactor * ((double) m.count - share));
             }
@@ -192,14 +204,14 @@ public class MetricMDNMPrecision extends AbstractMetricMultiDimensional {
         return new ILMultiDimensionalWithBound(createInformationLoss(result), 
                                                (AbstractILMultiDimensional)getLowerBoundInternal(node).clone());
     }
-
+    
     @Override
     protected ILMultiDimensionalWithBound getInformationLossInternal(Transformation node, HashGroupifyEntry entry) {
         double[] result = new double[getDimensions()];
         Arrays.fill(result, entry.count);
         return new ILMultiDimensionalWithBound(super.createInformationLoss(result));
     }
-    
+
     @Override
     protected AbstractILMultiDimensional getLowerBoundInternal(Transformation node) {
         
@@ -222,7 +234,7 @@ public class MetricMDNMPrecision extends AbstractMetricMultiDimensional {
                                                            HashGroupify groupify) {
        return getLowerBoundInternal(node);
     }
-
+    
     /**
      * For backwards compatibility only.
      *
@@ -247,7 +259,7 @@ public class MetricMDNMPrecision extends AbstractMetricMultiDimensional {
         setMin(min);
         setMax(max);
     }
-    
+
     @Override
     protected void initializeInternal(final DataManager manager,
                                       final DataDefinition definition, 
